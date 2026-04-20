@@ -7,6 +7,7 @@ export default {
             searchQuery: '',
             includeMediaChats: false,
             archiveFilter: '',
+            unreadFilter: '',
             currentPage: 1,
             pageSize: 10,
             totalChats: 0,
@@ -51,6 +52,10 @@ export default {
 
                 if (this.archiveFilter !== '') {
                     params.append('archived', this.archiveFilter);
+                }
+
+                if (this.unreadFilter !== '') {
+                    params.append('is_unread', this.unreadFilter);
                 }
 
                 const response = await window.http.get(`/chats?${params}`);
@@ -103,6 +108,11 @@ export default {
             if (jid.includes('@g.us')) return 'Group';
             if (jid.includes('@s.whatsapp.net')) return 'Contact';
             return 'Other';
+        },
+        unreadCountLabel(chat) {
+            if (!chat?.is_unread && !chat?.unread_count) return 'Read';
+            if (chat?.unread_count > 0) return `${chat.unread_count} unread`;
+            return 'Marked unread';
         }
     },
     mounted() {
@@ -161,6 +171,14 @@ export default {
                             <option value="false">Non-Archived</option>
                         </select>
                     </div>
+                    <div class="four wide field">
+                        <label>Unread Filter</label>
+                        <select class="ui dropdown" v-model="unreadFilter" @change="searchChats">
+                            <option value="">All States</option>
+                            <option value="true">Unread</option>
+                            <option value="false">Read</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             
@@ -182,6 +200,7 @@ export default {
                             <th>Name</th>
                             <th>Type</th>
                             <th>JID</th>
+                            <th>Unread</th>
                             <th>Last Message</th>
                             <th>Actions</th>
                         </tr>
@@ -202,6 +221,11 @@ export default {
                             </td>
                             <td class="collapsing">
                                 <code>{{ chat.jid }}</code>
+                            </td>
+                            <td class="collapsing">
+                                <div class="ui tiny label" :class="chat.is_unread ? 'orange' : 'grey'">
+                                    {{ unreadCountLabel(chat) }}
+                                </div>
                             </td>
                             <td>
                                 {{ formatTimestamp(chat.last_message_time) }}
