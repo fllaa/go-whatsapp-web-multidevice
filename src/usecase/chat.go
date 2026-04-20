@@ -411,6 +411,7 @@ func (service serviceChat) MarkChatUnread(ctx context.Context, request domainCha
 	}
 
 	var lastMessageKey *waCommon.MessageKey
+	var lastMessageTimestamp time.Time
 	messages, err := service.chatStorageRepo.GetMessages(&domainChatStorage.MessageFilter{
 		DeviceID: deviceID,
 		ChatJID:  request.ChatJID,
@@ -419,19 +420,21 @@ func (service serviceChat) MarkChatUnread(ctx context.Context, request domainCha
 	if err != nil {
 		return response, err
 	}
-	if len(messages) > 0 {
-		lastMessage := messages[0]
-		lastMessageKey = &waCommon.MessageKey{
-			ID:        proto.String(lastMessage.ID),
-			RemoteJID: proto.String(targetJID.String()),
-			FromMe:    proto.Bool(lastMessage.IsFromMe),
-		}
-		if targetJID.Server == "g.us" && !lastMessage.IsFromMe && lastMessage.Sender != "" {
-			lastMessageKey.Participant = proto.String(lastMessage.Sender)
-		}
+	if len(messages) == 0 {
+		return response, fmt.Errorf("cannot mark chat unread without a stored latest message")
+	}
+	lastMessage := messages[0]
+	lastMessageTimestamp = lastMessage.Timestamp
+	lastMessageKey = &waCommon.MessageKey{
+		ID:        proto.String(lastMessage.ID),
+		RemoteJID: proto.String(targetJID.String()),
+		FromMe:    proto.Bool(lastMessage.IsFromMe),
+	}
+	if targetJID.Server == "g.us" && !lastMessage.IsFromMe && lastMessage.Sender != "" {
+		lastMessageKey.Participant = proto.String(lastMessage.Sender)
 	}
 
-	patchInfo := appstate.BuildMarkChatAsRead(targetJID, !request.Unread, time.Now(), lastMessageKey)
+	patchInfo := appstate.BuildMarkChatAsRead(targetJID, !request.Unread, lastMessageTimestamp, lastMessageKey)
 
 	if err = client.SendAppState(ctx, patchInfo); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
