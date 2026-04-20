@@ -30,6 +30,8 @@ func handleMessage(ctx context.Context, evt *events.Message, chatStorageRepo dom
 		log.Errorf("Failed to store incoming message %s: %v", evt.Info.ID, err)
 	}
 
+	updateUnreadCountForIncomingMessage(ctx, evt, chatStorageRepo, client)
+
 	// Handle image message if present
 	handleImageMessage(ctx, evt, client)
 
@@ -96,6 +98,31 @@ func handleAutoMarkRead(ctx context.Context, evt *events.Message, client *whatsm
 		log.Warnf("Failed to mark message %s as read: %v", evt.Info.ID, err)
 	} else {
 		log.Debugf("Marked message %s as read", evt.Info.ID)
+	}
+}
+
+func updateUnreadCountForIncomingMessage(ctx context.Context, evt *events.Message, chatStorageRepo domainChatStorage.IChatStorageRepository, client *whatsmeow.Client) {
+	if evt == nil || chatStorageRepo == nil || evt.Info.IsFromMe || config.WhatsappAutoMarkRead {
+		return
+	}
+
+	deviceID := ""
+	if inst, ok := DeviceFromContext(ctx); ok && inst != nil {
+		deviceID = inst.JID()
+		if deviceID == "" {
+			deviceID = inst.ID()
+		}
+	}
+	if deviceID == "" && client != nil && client.Store != nil && client.Store.ID != nil {
+		deviceID = client.Store.ID.ToNonAD().String()
+	}
+	if deviceID == "" {
+		return
+	}
+
+	chatJID := NormalizeJIDFromLID(ctx, evt.Info.Chat, client).String()
+	if err := chatStorageRepo.IncrementUnreadCount(deviceID, chatJID); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{"device_id": deviceID, "chat_jid": chatJID}).Debug("Failed to increment unread count")
 	}
 }
 

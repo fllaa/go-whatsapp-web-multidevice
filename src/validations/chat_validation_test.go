@@ -184,6 +184,49 @@ func TestValidatePinChat(t *testing.T) {
 	}
 }
 
+func TestValidateMarkChatUnread(t *testing.T) {
+	type args struct {
+		request domainChat.MarkChatUnreadRequest
+	}
+	tests := []struct {
+		name string
+		args args
+		err  any
+	}{
+		{
+			name: "should success with mark unread request",
+			args: args{request: domainChat.MarkChatUnreadRequest{
+				ChatJID: "6289685028129@s.whatsapp.net",
+				Unread:  true,
+			}},
+			err: nil,
+		},
+		{
+			name: "should success with mark read request",
+			args: args{request: domainChat.MarkChatUnreadRequest{
+				ChatJID: "6289685028129@s.whatsapp.net",
+				Unread:  false,
+			}},
+			err: nil,
+		},
+		{
+			name: "should error with empty chat_jid",
+			args: args{request: domainChat.MarkChatUnreadRequest{
+				ChatJID: "",
+				Unread:  true,
+			}},
+			err: pkgError.ValidationError("chat_jid: cannot be blank."),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateMarkChatUnread(context.Background(), &tt.args.request)
+			assert.Equal(t, tt.err, err)
+		})
+	}
+}
+
 func TestValidateSetDisappearingTimer(t *testing.T) {
 	type args struct {
 		request domainChat.SetDisappearingTimerRequest

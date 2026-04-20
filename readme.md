@@ -120,8 +120,8 @@ Download:
   see [Webhook Payload Documentation](./docs/webhook-payload.md)
 - **Webhook Event Filtering**
   You can filter which events are forwarded to your webhook using:
-  - `--webhook-events="message,message.ack"` (comma-separated list)
-  - Or environment variable: `WHATSAPP_WEBHOOK_EVENTS=message,message.ack`
+  - `--webhook-events="message,message.ack,chat.unread"` (comma-separated list)
+  - Or environment variable: `WHATSAPP_WEBHOOK_EVENTS=message,message.ack,chat.unread`
 
   **Available Webhook Events:**
 
@@ -132,6 +132,7 @@ Download:
   | `message.revoked`    | Deleted/revoked messages                      |
   | `message.edited`     | Edited messages                               |
   | `message.ack`        | Delivery and read receipts                    |
+  | `chat.unread`        | Chat unread/read state changes                |
   | `message.deleted`    | Messages deleted for the user                 |
   | `group.participants` | Group member join/leave/promote/demote events |
   | `group.joined`       | You were added to a group                     |
@@ -332,6 +333,7 @@ protocol. Below is the complete list of available tools:
 - `whatsapp_get_chat_messages` - Fetch messages from specific chats with time/media filtering
 - `whatsapp_download_message_media` - Download images/videos from messages
 - `whatsapp_archive_chat` - Archive or unarchive a chat conversation
+- `whatsapp_mark_chat_unread` - Mark a chat unread or clear unread state
 
 ##### **👥 Group Management**
 
@@ -576,6 +578,7 @@ You can fork or edit this source code !
 | ✅       | Label Chat                             | POST   | /chat/:chat_jid/label               |
 | ✅       | Pin Chat                               | POST   | /chat/:chat_jid/pin                 |
 | ✅       | Archive Chat                           | POST   | /chat/:chat_jid/archive             |
+| ✅       | Mark Chat Unread                       | POST   | /chat/:chat_jid/unread              |
 | ✅       | Set Disappearing Messages              | POST   | /chat/:chat_jid/disappearing        |
 
 ```

@@ -12,6 +12,8 @@ type Chat struct {
 	CreatedAt           time.Time `db:"created_at"`
 	UpdatedAt           time.Time `db:"updated_at"`
 	Archived            bool      `db:"archived"`
+	IsUnread            bool      `db:"is_unread"`
+	UnreadCount         int       `db:"unread_count"`
 }
 
 // Message represents a WhatsApp message
@@ -78,4 +80,5 @@ type ChatFilter struct {
 	SearchName string
 	HasMedia   bool
 	IsArchived *bool
+	IsUnread   *bool
 }

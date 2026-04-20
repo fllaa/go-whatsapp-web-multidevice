@@ -64,6 +64,30 @@ func (r *deviceChatStorage) GetChats(filter *domainChatStorage.ChatFilter) ([]*d
 	return r.base.GetChats(filter)
 }
 
+func (r *deviceChatStorage) MarkChatUnread(deviceID, jid string, unread bool) error {
+	targetDeviceID := deviceID
+	if targetDeviceID == "" {
+		targetDeviceID = r.deviceID
+	}
+	return r.base.MarkChatUnread(targetDeviceID, jid, unread)
+}
+
+func (r *deviceChatStorage) IncrementUnreadCount(deviceID, jid string) error {
+	targetDeviceID := deviceID
+	if targetDeviceID == "" {
+		targetDeviceID = r.deviceID
+	}
+	return r.base.IncrementUnreadCount(targetDeviceID, jid)
+}
+
+func (r *deviceChatStorage) ResetUnreadCount(deviceID, jid string) error {
+	targetDeviceID := deviceID
+	if targetDeviceID == "" {
+		targetDeviceID = r.deviceID
+	}
+	return r.base.ResetUnreadCount(targetDeviceID, jid)
+}
+
 func (r *deviceChatStorage) DeleteChat(jid string) error {
 	return r.base.DeleteChatByDevice(r.deviceID, jid)
 }

@@ -1925,6 +1925,11 @@ paths:
           schema:
             type: boolean
           description: Filter by archived status. true = archived only, false = non-archived only. Omit to return all chats.
+        - name: is_unread
+          in: query
+          schema:
+            type: boolean
+          description: Filter by unread state. true = unread chats only, false = read chats only. Omit to return all chats.
       responses:
         '200':
           description: OK
@@ -2250,6 +2255,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ArchiveChatResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBadRequest'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorUnauthorized'
+        '404':
+          description: Chat Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNotFound'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorInternalServer'
+  /chat/{chat_jid}/unread:
+    post:
+      operationId: markChatUnread
+      tags:
+        - chat
+      summary: Mark a chat unread or read
+      description: Toggle the chat-level unread state for a conversation. This is distinct from per-message read receipts.
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdHeader'
+        - in: path
+          name: chat_jid
+          schema:
+            type: string
+          required: true
+          description: Chat JID (e.g., phone@s.whatsapp.net for individual or groupid@g.us for group)
+          example: '6289685028129@s.whatsapp.net'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                unread:
+                  type: boolean
+                  example: true
+                  description: Whether to mark the chat unread (true) or clear unread state (false)
+              required:
+                - unread
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkChatUnreadResponse'
         '400':
           description: Bad Request
           content:
@@ -4164,6 +4228,14 @@ components:
           type: boolean
           example: false
           description: Whether the chat is archived
+        is_unread:
+          type: boolean
+          example: false
+          description: Whether the chat is currently marked unread
+        unread_count:
+          type: integer
+          example: 3
+          description: Best-effort unread message count observed by the server
 
     ChatMessagesResponse:
       type: object
@@ -4363,6 +4435,33 @@ components:
               type: string
               example: '6289685028129@s.whatsapp.net'
             archived:
+              type: boolean
+              example: true
+    MarkChatUnreadResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 200
+        code:
+          type: string
+          example: SUCCESS
+        message:
+          type: string
+          example: Chat marked as unread
+        results:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: Chat marked as unread
+            chat_jid:
+              type: string
+              example: '6289685028129@s.whatsapp.net'
+            unread:
               type: boolean
               example: true
     GroupInfoResponse:

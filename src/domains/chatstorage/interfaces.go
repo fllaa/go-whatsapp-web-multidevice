@@ -18,6 +18,9 @@ type IChatStorageRepository interface {
 	GetChat(jid string) (*Chat, error)
 	GetChatByDevice(deviceID, jid string) (*Chat, error)
 	GetChats(filter *ChatFilter) ([]*Chat, error)
+	MarkChatUnread(deviceID, jid string, unread bool) error
+	IncrementUnreadCount(deviceID, jid string) error
+	ResetUnreadCount(deviceID, jid string) error
 	DeleteChat(jid string) error
 	DeleteChatByDevice(deviceID, jid string) error
 

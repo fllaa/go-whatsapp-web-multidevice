@@ -20,6 +20,7 @@ func InitRestChat(app fiber.Router, service domainChat.IChatUsecase) Chat {
 	app.Post("/chat/:chat_jid/pin", rest.PinChat)
 	app.Post("/chat/:chat_jid/disappearing", rest.SetDisappearingTimer)
 	app.Post("/chat/:chat_jid/archive", rest.ArchiveChat)
+	app.Post("/chat/:chat_jid/unread", rest.MarkChatUnread)
 
 	return rest
 }
@@ -35,6 +36,10 @@ func (controller *Chat) ListChats(c *fiber.Ctx) error {
 	if archivedStr := c.Query("archived"); archivedStr != "" {
 		isArchived := c.QueryBool("archived")
 		request.Archived = &isArchived
+	}
+	if unreadStr := c.Query("is_unread"); unreadStr != "" {
+		isUnread := c.QueryBool("is_unread")
+		request.IsUnread = &isUnread
 	}
 
 	response, err := controller.Service.ListChats(whatsapp.ContextWithDevice(c.UserContext(), getDeviceFromCtx(c)), request)
@@ -156,6 +161,31 @@ func (controller *Chat) ArchiveChat(c *fiber.Ctx) error {
 	}
 
 	response, err := controller.Service.ArchiveChat(whatsapp.ContextWithDevice(c.UserContext(), getDeviceFromCtx(c)), request)
+	utils.PanicIfNeeded(err)
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: response.Message,
+		Results: response,
+	})
+}
+
+func (controller *Chat) MarkChatUnread(c *fiber.Ctx) error {
+	var request domainChat.MarkChatUnreadRequest
+
+	request.ChatJID = c.Params("chat_jid")
+
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+			Results: nil,
+		})
+	}
+
+	response, err := controller.Service.MarkChatUnread(whatsapp.ContextWithDevice(c.UserContext(), getDeviceFromCtx(c)), request)
 	utils.PanicIfNeeded(err)
 
 	return c.JSON(utils.ResponseData{

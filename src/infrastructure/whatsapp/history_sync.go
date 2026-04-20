@@ -122,6 +122,8 @@ func processConversationMessages(ctx context.Context, data *waHistorySync.Histor
 
 		// Extract ephemeral expiration from conversation
 		ephemeralExpiration := conv.GetEphemeralExpiration()
+		unreadCount := int(conv.GetUnreadCount())
+		isUnread := conv.GetMarkedAsUnread() || unreadCount > 0
 
 		// Process messages in the conversation
 		messages := conv.GetMessages()
@@ -237,6 +239,9 @@ func processConversationMessages(ctx context.Context, data *waHistorySync.Histor
 				Name:                chatName,
 				LastMessageTime:     latestTimestamp,
 				EphemeralExpiration: ephemeralExpiration,
+				Archived:            conv.GetArchived(),
+				IsUnread:            isUnread,
+				UnreadCount:         unreadCount,
 			}
 
 			// Store or update the chat

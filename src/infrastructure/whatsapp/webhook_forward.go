@@ -128,6 +128,21 @@ func forwardToWebhooks(ctx context.Context, payload map[string]any, eventName st
 	return nil
 }
 
+func ForwardChatUnreadToWebhook(ctx context.Context, deviceID, chatJID string, unread bool, unreadCount int) error {
+	payload := map[string]any{
+		"event":     "chat.unread",
+		"device_id": deviceID,
+		"payload": map[string]any{
+			"chat_jid":     chatJID,
+			"unread":       unread,
+			"unread_count": unreadCount,
+			"timestamp":    time.Now().Unix(),
+		},
+	}
+
+	return forwardPayloadToConfiguredWebhooks(ctx, payload, "chat.unread")
+}
+
 // chatwootContactInfo holds extracted contact information for Chatwoot sync
 type chatwootContactInfo struct {
 	Identifier string

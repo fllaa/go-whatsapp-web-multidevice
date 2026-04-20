@@ -8,6 +8,7 @@ type ListChatsRequest struct {
 	Search   string `json:"search" query:"search"`
 	HasMedia bool   `json:"has_media" query:"has_media"`
 	Archived *bool  `json:"archived" query:"archived"`
+	IsUnread *bool  `json:"is_unread" query:"is_unread"`
 }
 
 type ListChatsResponse struct {
@@ -53,6 +54,8 @@ type ChatInfo struct {
 	CreatedAt           string `json:"created_at"`
 	UpdatedAt           string `json:"updated_at"`
 	Archived            bool   `json:"archived"`
+	IsUnread            bool   `json:"is_unread"`
+	UnreadCount         int    `json:"unread_count"`
 }
 
 type MessageInfo struct {
@@ -102,4 +105,17 @@ type ArchiveChatResponse struct {
 	Message  string `json:"message"`
 	ChatJID  string `json:"chat_jid"`
 	Archived bool   `json:"archived"`
+}
+
+// Mark Chat Unread operations
+type MarkChatUnreadRequest struct {
+	ChatJID string `json:"chat_jid" uri:"chat_jid"`
+	Unread  bool   `json:"unread"`
+}
+
+type MarkChatUnreadResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	ChatJID string `json:"chat_jid"`
+	Unread  bool   `json:"unread"`
 }

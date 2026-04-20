@@ -13,6 +13,8 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/appstate"
+	waCommon "go.mau.fi/whatsmeow/proto/waCommon"
+	"google.golang.org/protobuf/proto"
 )
 
 type serviceChat struct {
@@ -38,6 +40,7 @@ func (service serviceChat) ListChats(ctx context.Context, request domainChat.Lis
 		SearchName: request.Search,
 		HasMedia:   request.HasMedia,
 		IsArchived: request.Archived,
+		IsUnread:   request.IsUnread,
 	}
 
 	// Get chats from storage
@@ -66,6 +69,8 @@ func (service serviceChat) ListChats(ctx context.Context, request domainChat.Lis
 			CreatedAt:           chat.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:           chat.UpdatedAt.Format(time.RFC3339),
 			Archived:            chat.Archived,
+			IsUnread:            chat.IsUnread,
+			UnreadCount:         chat.UnreadCount,
 		}
 		chatInfos = append(chatInfos, chatInfo)
 	}
@@ -191,6 +196,8 @@ func (service serviceChat) GetChatMessages(ctx context.Context, request domainCh
 		CreatedAt:           chat.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:           chat.UpdatedAt.Format(time.RFC3339),
 		Archived:            chat.Archived,
+		IsUnread:            chat.IsUnread,
+		UnreadCount:         chat.UnreadCount,
 	}
 
 	// Create pagination response
@@ -370,6 +377,108 @@ func (service serviceChat) ArchiveChat(ctx context.Context, request domainChat.A
 		"chat_jid": request.ChatJID,
 		"archived": request.Archived,
 	}).Info("Chat archive operation completed successfully")
+
+	return response, nil
+}
+
+func (service serviceChat) MarkChatUnread(ctx context.Context, request domainChat.MarkChatUnreadRequest) (response domainChat.MarkChatUnreadResponse, err error) {
+	if err = validations.ValidateMarkChatUnread(ctx, &request); err != nil {
+		return response, err
+	}
+
+	client := whatsapp.ClientFromContext(ctx)
+	if client == nil {
+		return response, pkgError.ErrWaCLI
+	}
+
+	// Validate JID and ensure connection
+	targetJID, err := utils.ValidateJidWithLogin(client, request.ChatJID)
+	if err != nil {
+		return response, err
+	}
+
+	deviceID := deviceIDFromContext(ctx)
+	if deviceID == "" {
+		return response, fmt.Errorf("device identification required")
+	}
+
+	chat, err := service.chatStorageRepo.GetChatByDevice(deviceID, request.ChatJID)
+	if err != nil {
+		return response, err
+	}
+	if chat == nil {
+		return response, fmt.Errorf("chat with JID %s not found", request.ChatJID)
+	}
+
+	var lastMessageKey *waCommon.MessageKey
+	messages, err := service.chatStorageRepo.GetMessages(&domainChatStorage.MessageFilter{
+		DeviceID: deviceID,
+		ChatJID:  request.ChatJID,
+		Limit:    1,
+	})
+	if err != nil {
+		return response, err
+	}
+	if len(messages) > 0 {
+		lastMessage := messages[0]
+		lastMessageKey = &waCommon.MessageKey{
+			ID:        proto.String(lastMessage.ID),
+			RemoteJID: proto.String(targetJID.String()),
+			FromMe:    proto.Bool(lastMessage.IsFromMe),
+		}
+		if targetJID.Server == "g.us" && !lastMessage.IsFromMe && lastMessage.Sender != "" {
+			lastMessageKey.Participant = proto.String(lastMessage.Sender)
+		}
+	}
+
+	patchInfo := appstate.BuildMarkChatAsRead(targetJID, !request.Unread, time.Now(), lastMessageKey)
+
+	if err = client.SendAppState(ctx, patchInfo); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"chat_jid": request.ChatJID,
+			"unread":   request.Unread,
+		}).Error("Failed to send unread chat app state")
+		return response, err
+	}
+
+	if request.Unread {
+		chat.IsUnread = true
+		if err = service.chatStorageRepo.MarkChatUnread(deviceID, request.ChatJID, true); err != nil {
+			logrus.WithError(err).WithField("chat_jid", request.ChatJID).Warn("Failed to persist unread flag")
+		}
+	} else {
+		chat.IsUnread = false
+		chat.UnreadCount = 0
+		if err = service.chatStorageRepo.ResetUnreadCount(deviceID, request.ChatJID); err != nil {
+			logrus.WithError(err).WithField("chat_jid", request.ChatJID).Warn("Failed to reset unread state")
+		}
+	}
+
+	response.Status = "success"
+	response.ChatJID = request.ChatJID
+	response.Unread = request.Unread
+	if request.Unread {
+		response.Message = "Chat marked as unread"
+	} else {
+		response.Message = "Chat marked as read"
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"chat_jid": request.ChatJID,
+		"unread":   request.Unread,
+	}).Info("Chat unread operation completed successfully")
+
+	go func(chatJID string, unread bool, unreadCount int) {
+		webhookCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := whatsapp.ForwardChatUnreadToWebhook(webhookCtx, deviceID, chatJID, unread, unreadCount); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"device_id": deviceID,
+				"chat_jid":  chatJID,
+				"unread":    unread,
+			}).Warn("Failed to forward unread webhook")
+		}
+	}(request.ChatJID, request.Unread, chat.UnreadCount)
 
 	return response, nil
 }

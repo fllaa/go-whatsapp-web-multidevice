@@ -102,3 +102,15 @@ func ValidateArchiveChat(ctx context.Context, request *domainChat.ArchiveChatReq
 
 	return nil
 }
+
+func ValidateMarkChatUnread(ctx context.Context, request *domainChat.MarkChatUnreadRequest) error {
+	err := validation.ValidateStructWithContext(ctx, request,
+		validation.Field(&request.ChatJID, validation.Required),
+	)
+
+	if err != nil {
+		return pkgError.ValidationError(err.Error())
+	}
+
+	return nil
+}

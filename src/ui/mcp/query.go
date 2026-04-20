@@ -35,6 +35,7 @@ func (h *QueryHandler) AddQueryTools(mcpServer *server.MCPServer) {
 	mcpServer.AddTool(h.toolGetChatMessages(), h.handleGetChatMessages)
 	mcpServer.AddTool(h.toolDownloadMedia(), h.handleDownloadMedia)
 	mcpServer.AddTool(h.toolArchiveChat(), h.handleArchiveChat)
+	mcpServer.AddTool(h.toolMarkChatUnread(), h.handleMarkChatUnread)
 }
 
 func (h *QueryHandler) toolListContacts() mcp.Tool {
@@ -86,6 +87,9 @@ func (h *QueryHandler) toolListChats() mcp.Tool {
 			mcp.Description("If true, return only chats that contain media messages."),
 			mcp.DefaultBool(false),
 		),
+		mcp.WithBoolean("is_unread",
+			mcp.Description("If provided, return only chats currently marked unread (true) or read (false)."),
+		),
 	)
 }
 
@@ -96,6 +100,7 @@ func (h *QueryHandler) handleListChats(ctx context.Context, request mcp.CallTool
 	}
 
 	var hasMedia bool
+	var isUnreadPtr *bool
 	args := request.GetArguments()
 	if args != nil {
 		if value, ok := args["has_media"]; ok {
@@ -105,6 +110,13 @@ func (h *QueryHandler) handleListChats(ctx context.Context, request mcp.CallTool
 			}
 			hasMedia = parsed
 		}
+		if value, ok := args["is_unread"]; ok {
+			parsed, err := toBool(value)
+			if err != nil {
+				return nil, err
+			}
+			isUnreadPtr = &parsed
+		}
 	}
 
 	req := domainChat.ListChatsRequest{
@@ -112,6 +124,7 @@ func (h *QueryHandler) handleListChats(ctx context.Context, request mcp.CallTool
 		Offset:   request.GetInt("offset", 0),
 		Search:   request.GetString("search", ""),
 		HasMedia: hasMedia,
+		IsUnread: isUnreadPtr,
 	}
 
 	resp, err := h.chatService.ListChats(ctx, req)
@@ -365,4 +378,62 @@ func (h *QueryHandler) handleArchiveChat(ctx context.Context, request mcp.CallTo
 
 	fallback := resp.Message
 	return mcp.NewToolResultStructured(resp, fallback), nil
+}
+
+func (h *QueryHandler) toolMarkChatUnread() mcp.Tool {
+	return mcp.NewTool(
+		"whatsapp_mark_chat_unread",
+		mcp.WithDescription("Mark a WhatsApp chat as unread or clear its unread state."),
+		mcp.WithTitleAnnotation("Mark Chat Unread"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithString("chat_jid",
+			mcp.Description("The chat JID (e.g., 628123456789@s.whatsapp.net or group@g.us)."),
+			mcp.Required(),
+		),
+		mcp.WithBoolean("unread",
+			mcp.Description("Set to true to mark the chat unread, false to clear unread state."),
+			mcp.Required(),
+		),
+	)
+}
+
+func (h *QueryHandler) handleMarkChatUnread(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	ctx, err := mcpHelpers.ContextWithDefaultDevice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	chatJID, err := request.RequireString("chat_jid")
+	if err != nil {
+		return nil, err
+	}
+
+	args := request.GetArguments()
+	if args == nil {
+		return nil, fmt.Errorf("missing required argument: unread")
+	}
+
+	unreadValue, ok := args["unread"]
+	if !ok {
+		return nil, fmt.Errorf("missing required argument: unread")
+	}
+
+	unread, err := toBool(unreadValue)
+	if err != nil {
+		return nil, err
+	}
+
+	req := domainChat.MarkChatUnreadRequest{
+		ChatJID: chatJID,
+		Unread:  unread,
+	}
+
+	resp, err := h.chatService.MarkChatUnread(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultStructured(resp, resp.Message), nil
 }
